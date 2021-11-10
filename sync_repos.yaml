@@ -18,6 +18,8 @@
   - name: Get all users
     uri:
      url: "{{ src_git_url }}/api/v4/users?access_token={{ src_access_token }}"
+     headers:
+      PRIVATE-TOKEN: "{{ src_access_token }}"
     register: users
 
   - name: Loop over users
@@ -36,12 +38,16 @@
      - [ force_random_password, "true" ]
      body_format: form-urlencoded
      status_code: [201, 400, 409]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"
     with_items: "{{ user_array }}"
     ignore_errors: yes
 
   - name: Get all src projects
     uri:
      url: "{{ src_git_url }}/api/v4/projects?access_token={{ src_access_token }}"
+     headers:
+      PRIVATE-TOKEN: "{{ src_access_token }}"     
     register: src_projects
 
 
@@ -56,6 +62,8 @@
   - name: Get all dst users
     uri:
      url: "{{ dst_git_url }}/api/v4/users?access_token={{ dst_access_token }}"
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"     
     register: dst_users
 
   - name: Loop over dst users
@@ -74,6 +82,8 @@
      - [ user_id, "{{ dst_user_array | selectattr('username', 'equalto', item.owner) | map(attribute='id')  | min  }}" ]
      body_format: json
      status_code: [201, 400]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"          
     with_items: "{{ repo_array }}"
     ignore_errors: yes
 
