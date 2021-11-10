@@ -17,7 +17,7 @@
 
   - name: Get all users
     uri:
-     url: "{{ src_git_url }}/api/v4/users?access_token={{ src_access_token }}"
+     url: "{{ src_git_url }}/api/v4/users"
      headers:
       PRIVATE-TOKEN: "{{ src_access_token }}"
     register: users
@@ -29,8 +29,9 @@
 
   - name: Create users on destination gitlab
     uri:
-     url: "{{ dst_git_url }}/api/v4/users?access_token={{ dst_access_token }}"
+     url: "{{ dst_git_url }}/api/v4/users"
      method: POST
+     validate_certs: false
      body:
      - [ email, "{{ item.email }}" ]
      - [ name, "{{ item.name }}" ]
@@ -45,7 +46,7 @@
 
   - name: Get all src projects
     uri:
-     url: "{{ src_git_url }}/api/v4/projects?access_token={{ src_access_token }}"
+     url: "{{ src_git_url }}/api/v4/projects"
      headers:
       PRIVATE-TOKEN: "{{ src_access_token }}"     
     register: src_projects
@@ -61,7 +62,8 @@
 
   - name: Get all dst users
     uri:
-     url: "{{ dst_git_url }}/api/v4/users?access_token={{ dst_access_token }}"
+     url: "{{ dst_git_url }}/api/v4/users"
+     validate_certs: false
      headers:
       PRIVATE-TOKEN: "{{ dst_access_token }}"     
     register: dst_users
@@ -73,8 +75,9 @@
 
   - name: Create projects on destination gitlab
     uri:
-     url: "{{ dst_git_url }}/api/v4/projects/user/{{ dst_user_array | selectattr('username', 'equalto', item.owner) | map(attribute='id')  | min  }}?access_token={{ dst_access_token }}&name={{ item.name }}"
+     url: "{{ dst_git_url }}/api/v4/projects/user/{{ dst_user_array | selectattr('username', 'equalto', item.owner) | map(attribute='id')  | min  }}?name={{ item.name }}"
      method: POST
+     validate_certs: false
      body:
      - [ name, "{{ item.name }}" ]
      - [ visibility, "{{ item.visibility }}" ]
@@ -93,6 +96,6 @@
     # ignore_errors: yes   
 
   - name: Push repo on new Gitlab
-    shell: "cd repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin http://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
+    shell: "cd repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin https://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
     with_items: "{{ repo_array }}"
     # ignore_errors: yes       
