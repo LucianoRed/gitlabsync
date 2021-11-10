@@ -50,6 +50,7 @@
       PRIVATE-TOKEN: "{{ dst_access_token }}"
     with_items: "{{ user_array }}"
     ignore_errors: yes
+    when: sync_users == true
 
   - name: Get all src projects
     uri:
