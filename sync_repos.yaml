@@ -21,7 +21,7 @@
      url: "{{ src_git_url }}/api/v4/users?page={{ item }}&per_page=400"
      headers:
       PRIVATE-TOKEN: "{{ src_access_token }}"
-    loop: "{{ [1, 2, 3]}}"
+    loop: "{{ [1, 2, 3, 4]}}"
     register: users
 
   - name: Loop over users to generate users array
@@ -31,7 +31,7 @@
 
   - name: Loop over users
     set_fact:
-     user_array: "{{ user_array |  default([]) + [ { 'id': item.id, 'username': item.username, 'email' : item.email, 'name': item.name} ] }}"
+     user_array: "{{ user_array |  default([]) + [ { 'id': item.id, 'username': item.username, 'email' : item.email, 'name': item.name } ] }}"
     with_items: "{{ user_array_json }}"
 
   - name: Create users on destination gitlab
@@ -62,7 +62,7 @@
 
   - name: Loop over src projects
     set_fact:
-     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'visibility': item.visibility, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
+     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
     when: item.http_url_to_repo.split('/')[-2] != 'gitlab-instance-c9629139'
     with_items: "{{ src_projects.json }}"
   
