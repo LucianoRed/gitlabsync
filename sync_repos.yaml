@@ -61,7 +61,7 @@
 
   - name: Loop over src projects
     set_fact:
-     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'visibility': item.visibility, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'pages_access_level' : item.pages_access_level } ] }}"
+     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'visibility': item.visibility, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
     when: item.http_url_to_repo.split('/')[-2] != 'gitlab-instance-c9629139'
     with_items: "{{ src_projects.json }}"
   
