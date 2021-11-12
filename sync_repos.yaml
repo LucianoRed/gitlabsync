@@ -144,6 +144,15 @@
   #    msg: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
   #   with_items: "{{ src_projects.json }}"
 
+  - name: Debug projects
+    debug: var=src_projects
+
+  - name: Debug repo_array
+    debug: var=repo_array
+
+  - pause:  
+
+
   - name: Loop over src projects with Owners
     set_fact:
      repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path_with_namespace' : item.path_with_namespace, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'pages_access_level' : item.pages_access_level, 'type' : 'user' } ] }}"
@@ -191,10 +200,6 @@
     with_items: "{{ dst_groups.json }}"
 
 
-  - name: Debug projects
-    debug: var=src_projects
-
-  - pause:  
 
   - name: Create projects on destination gitlab with Owners
     uri:
