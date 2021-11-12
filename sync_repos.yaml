@@ -8,7 +8,12 @@
       repo_array: []
       user_array: []
       user_array_json: []
+      group_array: []
+      group_array_json: []
+      namespace_array: []
+      namespace_array_json: []      
       dst_user_array: []
+      dst_group_array: []
 
   - name: Create local temp repos
     file:
@@ -16,6 +21,9 @@
       state: directory
       mode: '0755'
 
+# ===================================
+# Users List (Origin)
+# ===================================
   - name: Get all users
     uri:
      url: "{{ src_git_url }}/api/v4/users?page={{ item }}&per_page=400"
@@ -33,6 +41,53 @@
     set_fact:
      user_array: "{{ user_array |  default([]) + [ { 'id': item.id, 'username': item.username, 'email' : item.email, 'name': item.name } ] }}"
     with_items: "{{ user_array_json }}"
+
+
+# ===================================
+# Group List (Origin)
+# ===================================
+  - name: Get all groups
+    uri:
+     url: "{{ src_git_url }}/api/v4/groups?page={{ item }}&per_page=400"
+     headers:
+      PRIVATE-TOKEN: "{{ src_access_token }}"
+    loop: "{{ [1, 2, 3, 4]}}"
+    register: gitgroups
+
+  - name: Loop over groups to generate groups array
+    set_fact:
+       group_array_json: "{{ group_array_json + [ item.json ]}}"
+    with_items: "{{ gitgroups.results }}"
+
+  - name: Loop over groups
+    set_fact:
+     group_array: "{{ group_array |  default([]) + [ { 'id': item.id, 'name': item.name, 'path' : item.path, 'description': item.description } ] }}"
+    with_items: "{{ group_array_json }}"
+
+# ===================================
+# Namespace List (Origin)
+# ===================================
+  # - name: Get all namespaces
+  #   uri:
+  #    url: "{{ src_git_url }}/api/v4/namespaces?page={{ item }}&per_page=400"
+  #    headers:
+  #     PRIVATE-TOKEN: "{{ src_access_token }}"
+  #   loop: "{{ [1, 2, 3, 4]}}"
+  #   register: namespaces
+
+  # - name: Loop over namespaces to generate namespaces array
+  #   set_fact:
+  #      namespace_array_json: "{{ namespace_array_json + [ item.json ]}}"
+  #   with_items: "{{ namespaces.results }}"
+
+  # - name: Loop over namespaces
+  #   set_fact:
+  #    namespace_array: "{{ namespace_array |  default([]) + [ { 'id': item.id, 'name': item.name, 'path' : item.path, 'kind': item.kind  } ] }}"
+  #   with_items: "{{ namespace_array_json }}"
+
+# ===================================
+# Users Creation (Destination)
+# ===================================
 
   - name: Create users on destination gitlab
     uri:
@@ -52,6 +107,31 @@
     ignore_errors: yes
     when: sync_users == true
 
+# ===================================
+# Groups Creation (Destination)
+# ===================================
+
+  - name: Create groups on destination gitlab
+    uri:
+     url: "{{ dst_git_url }}/api/v4/groups"
+     method: POST
+     validate_certs: false
+     body:
+     - [ name, "{{ item.name }}" ]
+     - [ path, "{{ item.path }}" ]
+     - [ description, "{{ item.description }}" ]
+     body_format: form-urlencoded
+     status_code: [201, 400, 409]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"
+    with_items: "{{ group_array }}"
+    ignore_errors: yes
+    when: sync_groups == true
+
+# ===================================
+# Getting Project list (Origin)
+# ===================================
+
   - name: Get all src projects
     uri:
      url: "{{ src_git_url }}/api/v4/projects"
@@ -64,14 +144,23 @@
   #    msg: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
   #   with_items: "{{ src_projects.json }}"
 
-  - name: Loop over src projects
+  - name: Loop over src projects with Owners
     set_fact:
-     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'pages_access_level' : item.pages_access_level } ] }}"
+     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path_with_namespace' : item.path_with_namespace, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'pages_access_level' : item.pages_access_level, 'type' : 'user' } ] }}"
     when: item.namespace.kind != 'group'
     with_items: "{{ src_projects.json }}"
+
+  - name: Loop over src projects with Namespaces
+    set_fact:
+     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path_with_namespace' : item.path_with_namespace, 'path' : item.path, 'namespace': item.namespace, 'visibility' : item.visibility, 'pages_access_level' : item.pages_access_level, 'type' : 'group' } ] }}"
+    when: item.namespace.kind == 'group'
+    with_items: "{{ src_projects.json }}"
+  
   
   - debug: var=repo_array
-
+# ===================================
+# Getting Users list (Destination)
+# ===================================
   - name: Get all dst users
     uri:
      url: "{{ dst_git_url }}/api/v4/users"
@@ -85,7 +174,23 @@
      dst_user_array: "{{ dst_user_array |  default([]) + [ { 'id': item.id, 'username': item.username, 'email' : item.email, 'name': item.name} ] }}"
     with_items: "{{ dst_users.json }}"
 
-  - name: Create projects on destination gitlab
+# ===================================
+# Getting Users list (Destination)
+# ===================================
+  - name: Get all dst groups
+    uri:
+     url: "{{ dst_git_url }}/api/v4/groups"
+     validate_certs: false
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"     
+    register: dst_groups
+
+  - name: Loop over dst groups
+    set_fact:
+     dst_group_array: "{{ dst_group_array |  default([]) + [ { 'name': item.name, 'path': item.path, 'description' : item.description} ] }}"
+    with_items: "{{ dst_groups.json }}"
+
+  - name: Create projects on destination gitlab with Owners
     uri:
      url: "{{ dst_git_url }}/api/v4/projects/user/{{ dst_user_array | selectattr('username', 'equalto', item.owner) | map(attribute='id')  | min  }}?name={{ item.name }}"
      method: POST
@@ -93,21 +198,52 @@
      body:
      - [ name, "{{ item.name }}" ]
      - [ visibility, "{{ item.visibility }}" ]
+     - [ path, "{{ item.path }}" ]
      - [ pages_access_level, "{{ item.pages_access_level }}" ]
      - [ user_id, "{{ dst_user_array | selectattr('username', 'equalto', item.owner) | map(attribute='id')  | min  }}" ]
      body_format: json
      status_code: [201, 400]
      headers:
       PRIVATE-TOKEN: "{{ dst_access_token }}"          
-    with_items: "{{ repo_array }}"
+    when: item.type == "owner"
+    with_items: "{{ repo_array }}" 
     ignore_errors: yes
 
-  - name: Clone mirror for repos
+  - name: Create projects on destination gitlab with Groups
+    uri:
+     url: "{{ dst_git_url }}/api/v4/projects/"
+     method: POST
+     validate_certs: false
+     body:
+     - [ name, "{{ item.name }}" ]
+     - [ visibility, "{{ item.visibility }}" ]
+     - [ path, "{{ item.path }}" ]
+     - [ pages_access_level, "{{ item.pages_access_level }}" ]
+     body_format: json
+     status_code: [201, 400]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"          
+    when: item.type == "group"
+    with_items: "{{ repo_array }}" 
+    ignore_errors: yes    
+
+  - name: Clone mirror for user repos 
     shell: "git clone --mirror http://oauth2:{{ src_access_token }}@{{ item.http_url_to_repo | regex_replace('http://', '') }} repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/"
     with_items: "{{ repo_array }}"
-    # ignore_errors: yes   
+    when: item.type == "user"
+
+  - name: Clone mirror for group repos
+    shell: "git clone --mirror http://oauth2:{{ src_access_token }}@{{ item.http_url_to_repo | regex_replace('http://', '') }} repos/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}}/"
+    with_items: "{{ repo_array }}"
+    when: item.type == "group"
+
 
   - name: Push repo on new Gitlab
     shell: "cd repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin https://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
     with_items: "{{ repo_array }}"
-    # ignore_errors: yes       
+    when: item.type == "user"
+
+  - name: Push repo on new Gitlab
+    shell: "cd repos/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin https://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
+    with_items: "{{ repo_array }}"
+    when: item.type == "group"
