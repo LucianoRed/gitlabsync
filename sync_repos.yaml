@@ -190,6 +190,12 @@
      dst_group_array: "{{ dst_group_array |  default([]) + [ { 'name': item.name, 'path': item.path, 'description' : item.description} ] }}"
     with_items: "{{ dst_groups.json }}"
 
+
+  - name: Debug projects
+    debug: var=src_projects
+
+  - pause:  
+
   - name: Create projects on destination gitlab with Owners
     uri:
      url: "{{ dst_git_url }}/api/v4/projects/user/{{ dst_user_array | selectattr('username', 'equalto', item.owner) | map(attribute='id')  | min  }}?name={{ item.name }}"
@@ -238,12 +244,14 @@
     when: item.type == "group"
 
 
-  - name: Push repo on new Gitlab
-    shell: "cd repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin https://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
-    with_items: "{{ repo_array }}"
+  - name: Push repo on new Gitlab with owner
+    shell: "cd repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin http://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
     when: item.type == "user"
+    with_items: "{{ repo_array }}"
+    ignore_errors: yes
 
-  - name: Push repo on new Gitlab
-    shell: "cd repos/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin https://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
+  - name: Push repo on new Gitlab with group
+    shell: "cd repos/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin http://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
     with_items: "{{ repo_array }}"
     when: item.type == "group"
+    ignore_errors: yes
