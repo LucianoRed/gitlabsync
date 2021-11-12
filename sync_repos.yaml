@@ -144,24 +144,24 @@
   #    msg: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
   #   with_items: "{{ src_projects.json }}"
 
-  - name: Debug projects
-    debug: var=src_projects
+  # - name: Debug projects
+  #   debug: var=src_projects
 
-  - name: Debug repo_array
-    debug: var=repo_array
+  # - name: Debug repo_array
+  #   debug: var=repo_array
 
-  - name: Debug
-    debug:
-     msg: "{{ repo_array  + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path_with_namespace' : item.path_with_namespace, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'type' : 'user' } ] }}"
-    when: item.namespace.kind != 'group'
-    with_items: "{{ src_projects.json }}"   
+  # - name: Debug
+  #   debug:
+  #    msg: "{{ repo_array  + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path_with_namespace' : item.path_with_namespace, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'type' : 'user' } ] }}"
+  #   when: item.namespace.kind != 'group'
+  #   with_items: "{{ src_projects.json }}"   
 
-  - pause:  
+  # - pause:  
 
 
   - name: Loop over src projects with Owners
     set_fact:
-     repo_array: "{{ repo_array  + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path_with_namespace' : item.path_with_namespace, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'type' : 'user' } ] }}"
+     repo_array: "{{ repo_array  + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path_with_namespace' : item.path_with_namespace, 'path' : item.path, 'namespace': item.namespace, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'type' : 'user' } ] }}"
     when: item.namespace.kind != 'group'
     with_items: "{{ src_projects.json }}"
 
