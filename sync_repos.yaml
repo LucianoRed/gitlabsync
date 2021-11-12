@@ -59,11 +59,15 @@
       PRIVATE-TOKEN: "{{ src_access_token }}"     
     register: src_projects
 
+  # - name: Debug src_projects
+  #   debug:
+  #    msg: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
+  #   with_items: "{{ src_projects.json }}"
 
   - name: Loop over src projects
     set_fact:
-     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id } ] }}"
-    when: item.http_url_to_repo.split('/')[-2] != 'gitlab-instance-c9629139'
+     repo_array: "{{ repo_array |  default([]) + [ { 'http_url_to_repo': item.http_url_to_repo, 'name': item.name, 'path' : item.path, 'owner': item.owner.username, 'ownerid' : item.owner.id, 'visibility' : item.visibility, 'pages_access_level' : item.pages_access_level } ] }}"
+    when: item.namespace.kind != 'group'
     with_items: "{{ src_projects.json }}"
   
   - debug: var=repo_array
