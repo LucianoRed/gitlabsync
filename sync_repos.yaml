@@ -216,7 +216,6 @@
      - [ name, "{{ item.name }}" ]
      - [ visibility, "{{ item.visibility }}" ]
      - [ path, "{{ item.path }}" ]
-     - [ pages_access_level, "{{ item.pages_access_level }}" ]
      - [ user_id, "{{ dst_user_array | selectattr('username', 'equalto', item.owner) | map(attribute='id')  | min  }}" ]
      body_format: json
      status_code: [201, 400]
@@ -235,7 +234,6 @@
      - [ name, "{{ item.name }}" ]
      - [ visibility, "{{ item.visibility }}" ]
      - [ path, "{{ item.path }}" ]
-     - [ pages_access_level, "{{ item.pages_access_level }}" ]
      body_format: json
      status_code: [201, 400]
      headers:
@@ -248,15 +246,16 @@
     shell: "git clone --mirror http://oauth2:{{ src_access_token }}@{{ item.http_url_to_repo | regex_replace('http://', '') }} repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/"
     with_items: "{{ repo_array }}"
     when: item.type == "user"
+    ignore_errors: yes
 
   - name: Clone mirror for group repos
     shell: "git clone --mirror http://oauth2:{{ src_access_token }}@{{ item.http_url_to_repo | regex_replace('http://', '') }} repos/{{ item.namespace.path }}/{{ item.http_url_to_repo.split('/')[-1]}}/"
     with_items: "{{ repo_array }}"
     when: item.type == "group"
-
+    ignore_errors: yes
 
   - name: Push repo on new Gitlab with owner
-    shell: "cd repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin http://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('http://', '') }}/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
+    shell: "cd repos/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}}/ && git remote set-url --push origin https://oauth2:{{ dst_access_token }}@{{ dst_git_url | regex_replace('https://', '') }}/{{ item.owner }}/{{ item.http_url_to_repo.split('/')[-1]}} && git push --mirror"
     when: item.type == "user"
     with_items: "{{ repo_array }}"
     ignore_errors: yes
