@@ -1,0 +1,33 @@
+- hosts: localhost
+  tasks:
+  - name: Inculde vars from config.yaml
+    include_vars: config.yaml
+
+  - name: Create empty vars
+    set_fact:
+      repo_array: []
+      user_array: []
+      user_array_json: []
+      group_array: []
+      group_array_json: []
+      namespace_array: []
+      namespace_array_json: []      
+
+  - name: Create local temp repos
+    file:
+      path: repos
+      state: directory
+      mode: '0755'
+
+
+  - name: Get all groups
+    uri:
+     url: "{{ src_git_url }}/api/v4/groups?page={{ item }}&per_page=400"
+     headers:
+      PRIVATE-TOKEN: "{{ src_access_token }}"
+    loop: "{{ [1, 2, 3, 4]}}"
+    register: gitgroups
+
+  - debug: var=gitgroups
+
+
