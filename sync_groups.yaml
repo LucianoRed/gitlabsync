@@ -1,0 +1,207 @@
+- hosts: localhost
+  tasks:
+  - name: Inculde vars from config.yaml
+    include_vars: config.yaml
+
+  - name: Create empty vars
+    set_fact:
+      repo_array: []
+      user_array: []
+      user_array_json: []
+      group_array: []
+      group_array_json: []
+      group_array_parent_dst: []
+      namespace_array: []
+      namespace_array_json: []      
+      dst_user_array: []
+      dst_group_array: []
+
+  - name: Create local temp repos
+    file:
+      path: repos
+      state: directory
+      mode: '0755'
+
+# ===================================
+# Users List (Origin)
+# ===================================
+  - name: Get all users
+    uri:
+     url: "{{ src_git_url }}/api/v4/users?page={{ item }}&per_page=400"
+     headers:
+      PRIVATE-TOKEN: "{{ src_access_token }}"
+    loop: "{{ [1, 2, 3, 4]}}"
+    register: users
+
+  - name: Loop over users to generate users array
+    set_fact:
+       user_array_json: "{{ user_array_json + [ item.json ]}}"
+    with_items: "{{ users.results }}"
+
+  - name: Loop over users
+    set_fact:
+     user_array: "{{ user_array |  default([]) + [ { 'id': item.id, 'username': item.username, 'email' : item.email, 'name': item.name } ] }}"
+    with_items: "{{ user_array_json }}"
+
+
+# ===================================
+# Group List (Origin)
+# ===================================
+  - name: Get all src groups
+    uri:
+     url: "{{ src_git_url }}/api/v4/groups?page={{ item }}&per_page=400"
+     headers:
+      PRIVATE-TOKEN: "{{ src_access_token }}"
+    loop: "{{ [1, 2, 3, 4]}}"
+    register: gitgroups
+
+  - name: Loop over groups to generate groups array
+    set_fact:
+       group_array_json: "{{ group_array_json + [ item.json ]}}"
+    with_items: "{{ gitgroups.results }}"
+
+  - name: Loop over groups
+    set_fact:
+     group_array: "{{ group_array |  default([]) + [ { 'id': item.id, 'name': item.name, 'path' : item.path, 'description': item.id, 'parent_id' : item.parent_id } ] }}"
+    with_items: "{{ group_array_json }}"
+    when: item.name != "GitLab Instance"
+
+  - debug: 
+      msg: "{{ item.parent_id | int }}"
+    with_items: "{{ group_array }}"
+    when: debug_enable == true
+
+  - pause:
+    when: debug_enable == true
+
+# ===================================
+# Users Creation (Destination)
+# ===================================
+
+  - name: Create users on destination gitlab
+    uri:
+     url: "{{ dst_git_url }}/api/v4/users"
+     method: POST
+     validate_certs: false
+     body:
+     - [ email, "{{ item.email }}" ]
+     - [ name, "{{ item.name }}" ]
+     - [ username, "{{ item.username }}" ]
+     - [ force_random_password, "true" ]
+     body_format: form-urlencoded
+     status_code: [201, 400, 409]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"
+    with_items: "{{ user_array }}"
+    ignore_errors: yes
+    when: sync_users == true
+
+# ===================================
+# Groups Creation (Destination)
+# ===================================
+
+  - name: Create groups on destination gitlab
+    uri:
+     url: "{{ dst_git_url }}/api/v4/groups"
+     method: POST
+     validate_certs: false
+     body:
+     - [ name, "{{ item.name }}" ]
+     - [ path, "{{ item.path }}" ]
+     - [ description, "{{ item.description }}" ]
+     body_format: form-urlencoded
+     status_code: [201, 400, 409]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"
+    with_items: "{{ group_array }}"
+    ignore_errors: yes
+    when: sync_groups == true and item.parent_id | int == 0
+
+# ===================================
+# Getting Users list (Destination)
+# ===================================
+  - name: Get all dst users
+    uri:
+     url: "{{ dst_git_url }}/api/v4/users"
+     validate_certs: false
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"     
+    register: dst_users
+
+  - name: Loop over dst users
+    set_fact:
+     dst_user_array: "{{ dst_user_array |  default([]) + [ { 'id': item.id, 'username': item.username, 'email' : item.email, 'name': item.name} ] }}"
+    with_items: "{{ dst_users.json }}"
+
+# ===================================
+# Getting Groups list (Destination)
+# ===================================
+  - name: Get all dst groups
+    uri:
+     url: "{{ dst_git_url }}/api/v4/groups"
+     validate_certs: false
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"     
+    register: dst_groups
+
+  - name: Loop over dst groups
+    set_fact:
+     dst_group_array: "{{ dst_group_array |  default([]) + [ { 'id': item.id, 'name': item.name, 'path': item.path, 'description' : item.description} ] }}"
+    with_items: "{{ dst_groups.json }}"
+
+
+  - name: Create subgroups on destination gitlab - Level 1
+    uri:
+     url: "{{ dst_git_url }}/api/v4/groups"
+     method: POST
+     validate_certs: false
+     body:
+     - [ name, "{{ item.name }}" ]
+     - [ path, "{{ item.path }}" ]
+     - [ description, "{{ item.id }}" ]
+     - [ parent_id, "{{ dst_group_array[lookup('ansible.utils.index_of', dst_group_array, 'eq', item.parent_id |string, 'description')|int].id }}" ]
+     body_format: form-urlencoded
+     status_code: [201, 400, 409]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"
+    with_items: "{{ group_array }}"
+    ignore_errors: yes
+    when: sync_groups == true and item.parent_id | int > 0 and lookup('ansible.utils.index_of', dst_group_array, 'eq', item.parent_id |string, 'description')|int > 0
+
+  - name: Zera dst groups
+    set_fact:
+       dst_groups: []
+       dst_group_array: []
+
+  - name: Get all dst groups - Level 2
+    uri:
+     url: "{{ dst_git_url }}/api/v4/groups"
+     validate_certs: false
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"     
+    register: dst_groups
+
+  - name: Loop over dst groups - Level 2
+    set_fact:
+     dst_group_array: "{{ dst_group_array |  default([]) + [ { 'id': item.id, 'name': item.name, 'path': item.path, 'description' : item.description} ] }}"
+    with_items: "{{ dst_groups.json }}"
+
+  - name: Create subgroups on destination gitlab - Level 2
+    uri:
+     url: "{{ dst_git_url }}/api/v4/groups"
+     method: POST
+     validate_certs: false
+     body:
+     - [ name, "{{ item.name }}" ]
+     - [ path, "{{ item.path }}" ]
+     - [ description, "{{ item.id }}" ]
+     - [ parent_id, "{{ dst_group_array[lookup('ansible.utils.index_of', dst_group_array, 'eq', item.parent_id |string, 'description')|int].id }}" ]
+     body_format: form-urlencoded
+     status_code: [201, 400, 409]
+     headers:
+      PRIVATE-TOKEN: "{{ dst_access_token }}"
+    with_items: "{{ group_array }}"
+    ignore_errors: yes
+    when: sync_groups == true and item.parent_id | int > 0 and lookup('ansible.utils.index_of', dst_group_array, 'eq', item.parent_id |string, 'description')|int > 0
+
+
